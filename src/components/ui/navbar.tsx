@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { 
@@ -18,7 +18,17 @@ import { useAuth } from "@/contexts/AuthContext";
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
-  const { user, userRole } = useAuth();
+  
+  // Safely access auth context
+  let user = null;
+  let userRole = null;
+  try {
+    const auth = useAuth();
+    user = auth.user;
+    userRole = auth.userRole;
+  } catch (error) {
+    // Auth context not available yet
+  }
 
   const navigation = [
     { name: "Projects", href: "/projects", icon: Eye },
