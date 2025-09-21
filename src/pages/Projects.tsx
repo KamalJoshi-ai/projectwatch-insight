@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,93 +12,55 @@ import {
 } from "lucide-react";
 import ProjectCard from "@/components/ui/project-card";
 import Navbar from "@/components/ui/navbar";
+import { supabase } from "@/integrations/supabase/client";
 
 const Projects = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock project data
-  const projects = [
-    {
-      id: "1",
-      title: "Smart City Infrastructure Development",
-      description: "Comprehensive urban development project including smart traffic systems, IoT sensors, and sustainable energy solutions across metropolitan areas.",
-      status: "active" as const,
-      location: "San Francisco, CA",
-      budget: "$125M",
-      agency: "Department of Urban Development",
-      startDate: "Jan 2024",
-      esgScore: 87,
-      completion: 45,
-      image: "/api/placeholder/400/200"
-    },
-    {
-      id: "2",
-      title: "Renewable Energy Grid Modernization",
-      description: "Upgrading power grid infrastructure to support renewable energy sources and improve efficiency across the state network.",
-      status: "active" as const,
-      location: "Austin, TX",
-      budget: "$89M",
-      agency: "State Energy Commission",
-      startDate: "Mar 2024",
-      esgScore: 94,
-      completion: 32,
-      image: "/api/placeholder/400/200"
-    },
-    {
-      id: "3",
-      title: "Public Transportation Expansion",
-      description: "Expanding metro line coverage with new stations, eco-friendly buses, and integrated digital payment systems.",
-      status: "pending" as const,
-      location: "Seattle, WA",
-      budget: "$67M",
-      agency: "Metro Transit Authority",
-      startDate: "May 2024",
-      esgScore: 78,
-      completion: 15,
-      image: "/api/placeholder/400/200"
-    },
-    {
-      id: "4",
-      title: "Water Management System Upgrade",
-      description: "Modernizing water treatment facilities and distribution networks to ensure sustainable water supply for growing population.",
-      status: "completed" as const,
-      location: "Phoenix, AZ",
-      budget: "$156M",
-      agency: "Water Resources Department",
-      startDate: "Sep 2023",
-      esgScore: 91,
-      completion: 100,
-      image: "/api/placeholder/400/200"
-    },
-    {
-      id: "5",
-      title: "Digital Government Services Platform",
-      description: "Creating unified digital platform for citizen services, permit applications, and government interactions.",
-      status: "delayed" as const,
-      location: "Boston, MA",
-      budget: "$43M",
-      agency: "Digital Services Agency",
-      startDate: "Nov 2023",
-      esgScore: 65,
-      completion: 28,
-      image: "/api/placeholder/400/200"
-    },
-    {
-      id: "6",
-      title: "Affordable Housing Initiative",
-      description: "Construction of sustainable, affordable housing units with integrated community services and green spaces.",
-      status: "active" as const,
-      location: "Denver, CO",
-      budget: "$198M",
-      agency: "Housing Development Authority",
-      startDate: "Feb 2024",
-      esgScore: 89,
-      completion: 67,
-      image: "/api/placeholder/400/200"
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          agencies (
+            name
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Transform data to match existing format
+      const transformedProjects = data?.map(project => ({
+        id: project.id,
+        title: project.title,
+        description: project.description,
+        status: project.status === 'ongoing' ? 'active' : project.status,
+        location: project.location,
+        budget: `₹${(project.budget / 10000000).toFixed(0)} Cr`,
+        agency: project.agencies?.name || 'Unknown Agency',
+        startDate: project.start_date ? new Date(project.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'TBD',
+        esgScore: project.esg_score,
+        completion: project.completion_percentage,
+        image: `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=500&h=300&fit=crop&auto=format`
+      })) || [];
+
+      setProjects(transformedProjects);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const statusFilters = [
     { value: "all", label: "All Projects", count: projects.length },
@@ -211,15 +173,23 @@ const Projects = () => {
         </div>
 
         {/* Projects Grid */}
-        <div className={
-          viewMode === "grid" 
-            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-            : "space-y-4"
-        }>
-          {filteredProjects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </div>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-96 bg-muted rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <div className={
+            viewMode === "grid" 
+              ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              : "space-y-4"
+          }>
+            {filteredProjects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
+          </div>
+        )}
 
         {/* Empty State */}
         {filteredProjects.length === 0 && (
